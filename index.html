@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Traductor ES ↔ 中文</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --es-bg: #0f1b2d;
+    --es-accent: #3b82f6;
+    --es-accent2: #60a5fa;
+    --es-text: #e2eaf8;
+    --zh-bg: #1a0a00;
+    --zh-accent: #dc2626;
+    --zh-accent2: #fbbf24;
+    --zh-text: #fef3e2;
+    --divider: #333;
+  }
+
+  html, body {
+    height: 100%;
+    width: 100%;
+    overflow: hidden;
+    font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  }
+
+  #app {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    width: 100%;
+  }
+
+  /* ─── SETUP SCREEN ─── */
+  #setup-screen {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: #0a0a0a;
+    padding: 2rem;
+    gap: 1.5rem;
+  }
+
+  #setup-screen h1 {
+    font-size: 1.6rem;
+    color: #fff;
+    text-align: center;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  #setup-screen p {
+    color: #888;
+    text-align: center;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    max-width: 300px;
+  }
+
+  .flag-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 2.5rem;
+  }
+
+  .flag-arrow { font-size: 1.2rem; color: #555; }
+
+  #api-input {
+    width: 100%;
+    max-width: 340px;
+    padding: 0.85rem 1rem;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 0.85rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #api-input:focus { border-color: #3b82f6; }
+  #api-input::placeholder { color: #555; }
+
+  #start-btn {
+    width: 100%;
+    max-width: 340px;
+    padding: 1rem;
+    background: linear-gradient(135deg, #3b82f6, #dc2626);
+    border: none;
+    border-radius: 14px;
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 0.02em;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+
+  #start-btn:active { transform: scale(0.97); opacity: 0.9; }
+
+  .setup-note {
+    font-size: 0.75rem;
+    color: #444;
+    text-align: center;
+    max-width: 300px;
+  }
+
+  /* ─── TRANSLATOR SCREEN ─── */
+  #translator-screen {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  /* Each panel */
+  .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.2rem 1.2rem 1rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .panel-es {
+    background: var(--es-bg);
+    transform: rotate(180deg);
+  }
+
+  .panel-zh {
+    background: var(--zh-bg);
+  }
+
+  /* Divider */
+  .divider {
+    height: 3px;
+    background: linear-gradient(90deg, var(--es-accent), var(--zh-accent));
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .divider-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-radius: 20px;
+    padding: 2px 12px;
+    font-size: 0.7rem;
+    color: #666;
+    white-space: nowrap;
+  }
+
+  /* Panel header */
+  .panel-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+  }
+
+  .lang-badge {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+  }
+
+  .panel-es .lang-badge {
+    background: rgba(59,130,246,0.2);
+    color: var(--es-accent2);
+  }
+
+  .panel-zh .lang-badge {
+    background: rgba(220,38,38,0.2);
+    color: var(--zh-accent2);
+  }
+
+  .status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #333;
+    margin-left: auto;
+    transition: background 0.3s;
+  }
+
+  .status-dot.listening { background: #22c55e; box-shadow: 0 0 6px #22c55e; animation: pulse 1.2s infinite; }
+  .status-dot.translating { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Text display */
+  .text-display {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.5rem 0;
+    min-height: 0;
+  }
+
+  .original-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    text-align: center;
+    opacity: 0.6;
+    min-height: 1.5em;
+    max-height: 4em;
+    overflow: hidden;
+  }
+
+  .panel-es .original-text { color: var(--es-text); }
+  .panel-zh .original-text { color: var(--zh-text); }
+
+  .translation-box {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border-radius: 14px;
+    padding: 0.8rem 1rem;
+    min-height: 70px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    border: 1px solid rgba(255,255,255,0.06);
+  }
+
+  .translation-main {
+    font-size: 1.3rem;
+    font-weight: 600;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  .panel-es .translation-main { color: var(--es-text); }
+  .panel-zh .translation-main { color: var(--zh-text); font-size: 1.6rem; }
+
+  .translation-pinyin {
+    font-size: 0.8rem;
+    color: var(--zh-accent2);
+    text-align: center;
+    opacity: 0.85;
+  }
+
+  .translation-sub {
+    font-size: 0.78rem;
+    opacity: 0.45;
+    text-align: center;
+  }
+
+  .panel-es .translation-sub { color: var(--es-text); }
+  .panel-zh .translation-sub { color: var(--zh-text); }
+
+  .placeholder-msg {
+    font-size: 0.85rem;
+    opacity: 0.3;
+    text-align: center;
+  }
+
+  .panel-es .placeholder-msg { color: var(--es-text); }
+  .panel-zh .placeholder-msg { color: var(--zh-text); }
+
+  /* Mic button */
+  .mic-btn {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    transition: transform 0.15s, box-shadow 0.2s;
+    flex-shrink: 0;
+    position: relative;
+  }
+
+  .panel-es .mic-btn {
+    background: linear-gradient(135deg, #1d4ed8, #3b82f6);
+    box-shadow: 0 4px 20px rgba(59,130,246,0.4);
+  }
+
+  .panel-zh .mic-btn {
+    background: linear-gradient(135deg, #991b1b, #dc2626);
+    box-shadow: 0 4px 20px rgba(220,38,38,0.4);
+  }
+
+  .mic-btn.active {
+    transform: scale(1.1);
+    animation: mic-glow 1s infinite alternate;
+  }
+
+  .panel-es .mic-btn.active { box-shadow: 0 4px 28px rgba(59,130,246,0.7); }
+  .panel-zh .mic-btn.active { box-shadow: 0 4px 28px rgba(220,38,38,0.7); }
+
+  @keyframes mic-glow {
+    from { transform: scale(1.08); }
+    to   { transform: scale(1.14); }
+  }
+
+  .mic-btn:active { transform: scale(0.95); }
+
+  /* Error toast */
+  #error-toast {
+    position: fixed;
+    bottom: 50%;
+    left: 50%;
+    transform: translateX(-50%) translateY(50%);
+    background: #1a1a1a;
+    border: 1px solid #dc2626;
+    color: #fca5a5;
+    padding: 0.7rem 1.2rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    z-index: 999;
+    text-align: center;
+    max-width: 280px;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+  }
+
+  #error-toast.show { opacity: 1; }
+
+  /* Loading dots */
+  .dots { display: inline-flex; gap: 4px; }
+  .dots span {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.3;
+    animation: dot-bounce 1.2s infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-bounce { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+
+  /* Settings button */
+  #settings-btn {
+    position: absolute;
+    bottom: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #444;
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 4px;
+  }
+</style>
+</head>
+<body>
+
+<!-- SETUP -->
+<div id="setup-screen">
+  <div class="flag-row">
+    <span>🇨🇱</span>
+    <span class="flag-arrow">⇄</span>
+    <span>🇨🇳</span>
+  </div>
+  <h1>Traductor<br>Español · 中文</h1>
+  <p>Conversación en tiempo real entre dos personas, cada una desde su lado de la pantalla.</p>
+  <input id="api-input" type="password" placeholder="API Key de Anthropic (sk-ant-...)" autocomplete="off" />
+  <button id="start-btn">Iniciar conversación</button>
+  <p class="setup-note">La clave se usa solo en este dispositivo y no se almacena en ningún servidor.</p>
+</div>
+
+<!-- TRANSLATOR -->
+<div id="translator-screen">
+
+  <!-- Panel CHINO (arriba, orientado hacia la persona frente al teléfono) -->
+  <div class="panel panel-zh" id="panel-zh">
+    <div class="panel-header">
+      <span class="lang-badge">中文</span>
+      <span style="font-size:0.75rem; color:#666; margin-left:4px;">→ Español</span>
+      <span class="status-dot" id="dot-zh"></span>
+    </div>
+
+    <div class="text-display">
+      <div class="original-text" id="orig-zh"></div>
+      <div class="translation-box" id="box-zh">
+        <span class="placeholder-msg">Presiona el micrófono para hablar en chino</span>
+      </div>
+    </div>
+
+    <button class="mic-btn" id="mic-zh" onclick="toggleMic('zh')">🎙️</button>
+  </div>
+
+  <!-- Divisor -->
+  <div class="divider">
+    <span class="divider-label">ES ⇄ 中文</span>
+  </div>
+
+  <!-- Panel ESPAÑOL (abajo, orientado al dueño del teléfono) -->
+  <div class="panel panel-es" id="panel-es">
+    <div class="panel-header">
+      <span class="lang-badge">Español</span>
+      <span style="font-size:0.75rem; color:#555; margin-left:4px;">→ 中文</span>
+      <span class="status-dot" id="dot-es"></span>
+    </div>
+
+    <div class="text-display">
+      <div class="original-text" id="orig-es"></div>
+      <div class="translation-box" id="box-es">
+        <span class="placeholder-msg">Presiona el micrófono para hablar en español</span>
+      </div>
+    </div>
+
+    <button class="mic-btn" id="mic-es" onclick="toggleMic('es')">🎙️</button>
+  </div>
+
+  <button id="settings-btn" onclick="goToSetup()" title="Cambiar API Key">⚙️</button>
+</div>
+
+<!-- Error toast -->
+<div id="error-toast"></div>
+
+<script>
+  // ─── STATE ───────────────────────────────────────────────────────────
+  let apiKey = '';
+  let recognition = null;
+  let activePanel = null; // 'es' | 'zh'
+  let isListening = false;
+  let speechSupported = !!window.SpeechRecognition || !!window.webkitSpeechRecognition;
+
+  // ─── SETUP ───────────────────────────────────────────────────────────
+  document.getElementById('start-btn').addEventListener('click', () => {
+    const key = document.getElementById('api-input').value.trim();
+    if (!key.startsWith('sk-ant-') && !key.startsWith('sk-')) {
+      showError('Ingresa una API Key válida de Anthropic');
+      return;
+    }
+    apiKey = key;
+    sessionStorage.setItem('ak', key);
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('translator-screen').style.display = 'flex';
+    if (!speechSupported) {
+      showError('Tu navegador no soporta reconocimiento de voz. Usa Chrome en Android.');
+    }
+  });
+
+  // Restore key
+  const saved = sessionStorage.getItem('ak');
+  if (saved) document.getElementById('api-input').value = saved;
+
+  // ─── MIC TOGGLE ──────────────────────────────────────────────────────
+  function toggleMic(panel) {
+    if (isListening && activePanel === panel) {
+      stopListening();
+      return;
+    }
+    if (isListening) stopListening();
+    startListening(panel);
+  }
+
+  function startListening(panel) {
+    if (!speechSupported) { showError('Reconocimiento de voz no disponible en este navegador'); return; }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.lang = panel === 'es' ? 'es-CL' : 'zh-CN';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    activePanel = panel;
+    isListening = true;
+    setMicState(panel, true);
+
+    recognition.onresult = (e) => {
+      let interim = '', final = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const t = e.results[i][0].transcript;
+        if (e.results[i].isFinal) final += t;
+        else interim += t;
+      }
+      const text = final || interim;
+      document.getElementById(`orig-${panel}`).textContent = text;
+      if (final) {
+        stopListening(false);
+        translate(final, panel);
+      }
+    };
+
+    recognition.onerror = (e) => {
+      if (e.error !== 'aborted') showError(`Error de micrófono: ${e.error}`);
+      stopListening(false);
+    };
+
+    recognition.onend = () => {
+      if (isListening) stopListening(false);
+    };
+
+    recognition.start();
+  }
+
+  function stopListening(resetOriginal = false) {
+    isListening = false;
+    if (recognition) { try { recognition.stop(); } catch(e){} recognition = null; }
+    if (activePanel) {
+      setMicState(activePanel, false);
+      if (resetOriginal) document.getElementById(`orig-${activePanel}`).textContent = '';
+    }
+    activePanel = null;
+  }
+
+  function setMicState(panel, active) {
+    const btn = document.getElementById(`mic-${panel}`);
+    const dot = document.getElementById(`dot-${panel}`);
+    btn.classList.toggle('active', active);
+    dot.className = 'status-dot' + (active ? ' listening' : '');
+    btn.textContent = active ? '⏹️' : '🎙️';
+  }
+
+  // ─── TRANSLATE ───────────────────────────────────────────────────────
+  async function translate(text, sourcePanel) {
+    const targetPanel = sourcePanel === 'es' ? 'zh' : 'es';
+    const box = document.getElementById(`box-${targetPanel}`);
+    const dot = document.getElementById(`dot-${sourcePanel}`);
+
+    dot.className = 'status-dot translating';
+    box.innerHTML = '<div class="dots"><span></span><span></span><span></span></div>';
+
+    const isEsToZh = sourcePanel === 'es';
+    const systemPrompt = isEsToZh
+      ? `Eres un traductor experto de español a chino mandarín. 
+         Dado un texto en español, responde ÚNICAMENTE con un JSON con este formato exacto (sin markdown, sin explicaciones):
+         {"translation":"[caracteres chinos]","pinyin":"[pinyin con tonos]","back":"[retraducción literal al español]"}
+         Sé natural y preciso. El pinyin debe tener marcas de tono (ā á ǎ à etc).`
+      : `You are an expert translator from Mandarin Chinese to Spanish (Chilean).
+         Given Chinese text, respond ONLY with JSON in this exact format (no markdown, no explanation):
+         {"translation":"[Spanish translation]","pinyin":"[pinyin with tone marks]","back":"[literal back-translation to Chinese]"}
+         Be natural and precise.`;
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true'
+        },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-6',
+          max_tokens: 400,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: text }]
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const raw = data.content?.[0]?.text?.trim() || '';
+
+      let parsed;
+      try {
+        const clean = raw.replace(/```json|```/g, '').trim();
+        parsed = JSON.parse(clean);
+      } catch {
+        parsed = { translation: raw, pinyin: '', back: '' };
+      }
+
+      dot.className = 'status-dot';
+
+      if (isEsToZh) {
+        // ES → ZH: mostrar caracteres, pinyin, retraducción
+        box.innerHTML = `
+          <div class="translation-main">${escHtml(parsed.translation)}</div>
+          ${parsed.pinyin ? `<div class="translation-pinyin">${escHtml(parsed.pinyin)}</div>` : ''}
+          ${parsed.back ? `<div class="translation-sub">"${escHtml(parsed.back)}"</div>` : ''}
+        `;
+      } else {
+        // ZH → ES: mostrar traducción al español
+        box.innerHTML = `
+          <div class="translation-main">${escHtml(parsed.translation)}</div>
+          ${parsed.back ? `<div class="translation-sub">${escHtml(parsed.back)}</div>` : ''}
+        `;
+      }
+
+    } catch (err) {
+      dot.className = 'status-dot';
+      box.innerHTML = `<span style="color:#ef4444;font-size:0.8rem;">${escHtml(err.message)}</span>`;
+      showError('Error al traducir: ' + err.message);
+    }
+  }
+
+  // ─── UTILS ───────────────────────────────────────────────────────────
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  let errorTimer;
+  function showError(msg) {
+    const t = document.getElementById('error-toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(errorTimer);
+    errorTimer = setTimeout(() => t.classList.remove('show'), 4000);
+  }
+
+  function goToSetup() {
+    stopListening();
+    document.getElementById('translator-screen').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+  }
+</script>
+</body>
+</html>
